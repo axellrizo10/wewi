@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="css/estilo.css">
+    <link rel="shortcut icon" href="img/logo_temporal2.png" type="image/x-icon">
+    <title>Pre_Computada</title>
+</head>
+<body>
+    <body>
+        <h1>Pre Computada Prototipo 1</h1>
+        <label for="rowCount">Número de filas:</label>
+        <input type="number" id="rowCount" min="1" value="1">
+        <button onclick="crearTabla()">Crear Tabla</button>
+    
+        <div class="tabla-container">
+            <table id="miTabla">
+                <thead>
+                    <tr>
+                        <td colspan="6" class="consumo-message">Ubicar consumo de la aeronave L x H</td>
+                        <td colspan="2">
+                            <input type="text" placeholder="Valor de consumo" id="consumoInput" oninput="calcularConsumoGlobal()">
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Punto a Punto</th>
+                        <th>GS</th>
+                        <th>Distancia</th>
+                        <th>ETE</th>
+                        <th>ETA</th>
+                        <th>ATA</th>
+                        <th>Fuel</th>
+                        <th>Consumo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                </tbody>
+                <tfoot>
+                    <tr class="total-row">
+                        <td>Total:</td>
+                        <td></td>
+                        <td id="totalDistancia"></td>
+                        <td id="totalETE"></td>
+                        <td></td>
+                        <td></td>
+                        <td id="totalFuel"></td>
+                        <td id="totalConsumo"></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    
+        <script>
+            function crearTabla() {
+                const rowCount = document.getElementById('rowCount').value;
+                const tbody = document.querySelector('#miTabla tbody');
+                const existingRows = Array.from(tbody.rows); // Guardar las filas existentes
+    
+                // Limpiar filas existentes
+                tbody.innerHTML = ''; 
+    
+                // Crear filas hasta el total deseado
+                for (let i = 0; i < rowCount; i++) {
+                    const row = document.createElement('tr');
+    
+                    // Si hay filas existentes, usar los valores
+                    const existingRow = existingRows[i] || createEmptyRow();
+                    
+                    for (let j = 0; j < 8; j++) {
+                        const cell = document.createElement('td');
+                        const input = document.createElement('input');
+    
+                        if (j === 0) { // Solo en la primera columna
+                            input.type = 'text';
+                            input.placeholder = `Waypoint 1, Waypoint 2`;
+                            input.value = existingRow.cells[j] ? existingRow.cells[j].querySelector('input').value : '';
+                            input.oninput = function() {
+                                // Permitir solo dos valores separados por coma
+                                const values = input.value.split(',');
+                                if (values.length > 2) {
+                                    input.value = values.slice(0, 2).join(','); // Limitar a dos valores
+                                }
+                            };
+                        } else if (j === 1 ) { // Columna GS 
+                            input.type = 'number';
+                            input.placeholder = `Distancia`;
+                            input.value = existingRow.cells[j] ? existingRow.cells[j].querySelector('input').value : '';
+                            input.oninput = calcularETE; // Añadir evento para calcular GS
+                            
+                        } else if ( j === 2) { // Columna Distancia
+                            input.type = 'number';
+                            input.placeholder = `Distancia`;
+                            input.value = existingRow.cells[j] ? existingRow.cells[j].querySelector('input').value : '';
+                            input.oninput = calcularETE; // Añadir evento para calcular Distancia
+
+                        } else if (j === 3) { // Columna ETE
+                            input.type = 'text';
+                            input.placeholder = `ETE`;
+                            input.value = existingRow.cells[j] ? existingRow.cells[j].querySelector('input').value : '';
+                            input.readOnly = true; // Hacer el campo ETE de solo lectura
+
+                        } else if (j === 4) { // Columna ATE
+                            input.type = 'text';
+                            input.placeholder = `ATE`;
+                            input.value = existingRow.cells[j] ? existingRow.cells[j].querySelector('input').value : '';
+                            input.readOnly = true; // Hacer el campo ATE de solo lectura
+
+                        } else if (j === 5) { // Columna ATA
+                            input.type = 'text';
+                            input.placeholder = `ATA`;
+                            input.value = existingRow.cells[j] ? existingRow.cells[j].querySelector('input').value : '';
+                            input.readOnly = true; // Hacer el campo ATA de solo lectura
+
+                        } else if (j === 7) { // Columna Consumo
+                            input.type = 'text';
+                            input.placeholder = `Consumo`;
+                            input.value = existingRow.cells[j] ? existingRow.cells[j].querySelector('input').value : '';
+                            input.readOnly = true; // Hacer el campo Consumo de solo lectura
+
+                        } else if (j === 6) { // Columna Fuel
+                            input.type = 'number'; // Permitir entrada de números
+                            input.placeholder = `Fuel`;
+                            input.value = existingRow.cells[j] ? existingRow.cells[j].querySelector('input').value : '';
+                            input.oninput = function() {
+                                calcularFuel(); // Calcular Fuel al modificar
+                            }; 
+                        } else {
+                            input.type = 'text';
+                            input.placeholder = `Fila ${i + 1}, Col ${j + 1}`;
+                            input.value = existingRow.cells[j] ? existingRow.cells[j].querySelector('input').value : '';
+                        }
+    
+                        cell.appendChild(input);
+                        row.appendChild(cell);
+                    }
+                    tbody.appendChild(row);
+                }
+                calcularTotales(); // Calcular totales al crear la tabla
+            }
+    
+            function createEmptyRow() {
+                const row = document.createElement('tr');
+                for (let j = 0; j < 8; j++) {
+                    const cell = document.createElement('td');
+                    const input = document.createElement('input');
+                    input.type = (j === 6) ? 'number' : 'text'; // Fuel es numérico, los demás son texto
+                    input.placeholder = `Fila, Col ${j + 1}`;
+                    cell.appendChild(input);
+                    row.appendChild(cell);
+                }
+                return row;
+            }
+    
+            function calcularETE() {
+                const row = this.closest('tr'); // Obtiene la fila de la celda
+                const gsInput = row.cells[1].querySelector('input'); // GS
+                const distanciaInput = row.cells[2].querySelector('input'); // Distancia
+                const eteInput = row.cells[3].querySelector('input'); // ETE
+    
+                const gs = parseFloat(gsInput.value);
+                const distancia = parseFloat(distanciaInput.value);
+    
+                if (!isNaN(gs) && !isNaN(distancia) && gs > 0) {
+                    const ete = (distancia / gs) * 60;
+                    eteInput.value = ete.toFixed(2); // Mostrar ETE con dos decimales
+                    calcularConsumoGlobal(); // Actualizar Consumo
+                    calcularFuel(); // Actualizar Fuel
+                } else {
+                    eteInput.value = ''; // Limpiar ETE si los valores no son válidos
+                    row.cells[7].querySelector('input').value = ''; // Limpiar Consumo
+                }
+                calcularTotales(); // Actualizar totales después de calcular ETE
+            }
+    
+            function calcularConsumoGlobal() {
+                const globalConsumoInput = document.getElementById('consumoInput'); // Obtener el valor de consumo global
+                const globalConsumo = parseFloat(globalConsumoInput.value); // Obtener el valor
+    
+                const rows = document.querySelectorAll('#miTabla tbody tr'); // Obtener todas las filas de la tabla
+                rows.forEach(row => {
+                    const eteInput = row.cells[3].querySelector('input'); // ETE
+                    const consumoInput = row.cells[7].querySelector('input'); // Consumo
+    
+                    const ete = parseFloat(eteInput.value); // Obtener el valor de ETE
+    
+                    if (!isNaN(ete) && !isNaN(globalConsumo)) {
+                        const consumo = (ete / 60) * globalConsumo; // Calcular Consumo
+                        consumoInput.value = consumo.toFixed(2); // Mostrar Consumo con dos decimales
+                    } else {
+                        consumoInput.value = ''; // Limpiar Consumo si ETE o consumo global no son válidos
+                    }
+                });
+                calcularFuel(); // Actualizar Fuel después de calcular Consumo
+                calcularTotales(); // Actualizar totales después de calcular Consumo
+            }
+    
+            function calcularFuel() {
+                const rows = document.querySelectorAll('#miTabla tbody tr'); // Obtener todas las filas de la tabla
+    
+                for (let i = 0; i < rows.length; i++) {
+                    const fuelInput = rows[i].cells[6].querySelector('input'); // Input de Fuel en la fila actual
+                    const consumoInput = rows[i].cells[7].querySelector('input'); // Input de Consumo en la fila actual
+    
+                    if (i === 0) {
+                        // Fila 1
+                        // El usuario puede ingresar un valor
+                    } else {
+                        // Filas 2 y posteriores
+                        const prevFuelInput = rows[i - 1].cells[6].querySelector('input'); // Fuel de la fila anterior
+                        const prevConsumoInput = rows[i - 1].cells[7].querySelector('input'); // Consumo de la fila anterior
+    
+                        const prevFuel = parseFloat(prevFuelInput.value);
+                        const prevConsumo = parseFloat(prevConsumoInput.value);
+    
+                        if (!isNaN(prevFuel) && !isNaN(prevConsumo)) {
+                            const newFuel = prevFuel - prevConsumo; // Calcular el nuevo Fuel
+                            fuelInput.value = newFuel.toFixed(2); // Actualizar Fuel para la fila actual
+                        }
+                    }
+                }
+                calcularTotales(); // Actualizar totales después de calcular Fuel
+            }
+    
+            function calcularTotales() {
+                const rows = document.querySelectorAll('#miTabla tbody tr'); // Obtener todas las filas de la tabla
+                let totalDistancia = 0;
+                let totalETE = 0;
+                let totalFuel = 0;
+                let totalConsumo = 0;
+    
+                rows.forEach(row => {
+                    const distanciaInput = row.cells[2].querySelector('input');
+                    const eteInput = row.cells[3].querySelector('input');
+                    const fuelInput = row.cells[6].querySelector('input');
+                    const consumoInput = row.cells[7].querySelector('input');
+    
+                    const distancia = parseFloat(distanciaInput.value) || 0;
+                    const ete = parseFloat(eteInput.value) || 0;
+                    const fuel = parseFloat(fuelInput.value) || 0;
+                    const consumo = parseFloat(consumoInput.value) || 0;
+    
+                    totalDistancia += distancia;
+                    totalETE += ete;
+                    totalFuel += fuel;
+                    totalConsumo += consumo;
+                });
+    
+                const fuelInicial = parseFloat(rows[0].cells[6].querySelector('input').value) || 0; // Valor de Fuel en la fila 1
+                totalFuel = fuelInicial - totalConsumo; // Total de Fuel menos el total de Consumo
+    
+                document.getElementById('totalDistancia').innerText = totalDistancia.toFixed(2) + ' NM';
+                document.getElementById('totalETE').innerText = totalETE.toFixed(2) + ' min';
+                document.getElementById('totalFuel').innerText = totalFuel.toFixed(2);
+                document.getElementById('totalConsumo').innerText = (totalConsumo * -1).toFixed(2); // Multiplicando por -1 para el total de Consumo
+            }
+        </script>
+        <h3>FORMULAS</h3>
+        <h4>ETE = DISTANCIA/GS * 60</h4>
+        <h4>CONSUMO = LITROS x HORA * ETE / 60</H4>
+</body>
+</html>
